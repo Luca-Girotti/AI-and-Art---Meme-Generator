@@ -1,0 +1,11 @@
+accelerate
+transformers
+peft
+datasets
+bitsandbytes
+torch
+pillow
+gradio
+opencv-python-headless
+python-dotenv
+pyyaml

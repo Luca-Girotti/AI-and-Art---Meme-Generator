@@ -1,0 +1,56 @@
+# Run & seed
+run_name: meme_upgraded_round_2_run
+seed: 42
+
+# Base model
+model_name: "Salesforce/instructblip-flan-t5-xl"
+quantization: null   # (bitsandbytes doesn't help on CPU-only; keep null)
+
+# Data
+train_csv: "dataset/memes_combo_styleA_rewritten.csv"
+val_csv: null
+image_col: "image_path"
+text_col: "caption"
+style_col: "style"
+
+# Prompt
+prompt_template: |
+  You are a sarcastic, witty meme writer.
+  Task: Given the image, produce ONE short, punchy meme caption (max 18 words).
+  Tone: playful, ironic, slightly roasty but non-toxic.
+  Avoid emojis and hashtags.
+  Caption:
+
+# Output
+output_dir: "outputs"
+
+# Batching (CPU-friendly)
+per_device_train_batch_size: 1
+per_device_eval_batch_size: 1
+gradient_accumulation_steps: 4   # accumulates to an effective batch of 4
+
+# Schedule (small, meaningful budget)
+num_train_epochs: 1
+max_steps: 200                    # remove or raise later (e.g., 1_000)
+learning_rate: 1e-4
+weight_decay: 0.01
+warmup_ratio: 0.03
+
+# LoRA (T5 blocks)
+target_modules: ["q","k","v","o","wi_0","wi_1","wo"]
+lora_r: 16
+lora_alpha: 32
+lora_dropout: 0.05
+
+# Logging / eval / save
+save_steps: 0
+eval_steps: 0
+logging_steps: 20
+
+# Generation
+num_beams: 4
+max_new_tokens: 32
+
+# Precision
+fp16: false
+bf16: false
