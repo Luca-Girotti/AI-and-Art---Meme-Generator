@@ -4,7 +4,7 @@ End‑to‑end project to fine‑tune an open‑source **InstructBLIP (flan-t5-x
 
 ## Why InstructBLIP?
 - It’s a visual‑language instruction‑tuned model with strong image captioning ability.
-- The **FLAN‑T5‑Large** text head avoids Vicuna licensing complexity.
+- The **flan-t5-xl** text head avoids Vicuna licensing complexity.
 - We fine‑tune with **LoRA** (PEFT) for efficiency, optionally with 8‑bit/4‑bit loading.
 
 ## Project Structure
