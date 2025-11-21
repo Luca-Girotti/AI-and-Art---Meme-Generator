@@ -8,7 +8,7 @@ from .infer import generate as generate_captions
 
 
 # --------------------------------------------------
-# TEXT MEASUREMENT HELPER (Pillow >= 10 friendly)
+# TEXT MEASUREMENT HELPER
 # --------------------------------------------------
 def _text_width(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont) -> int:
     """
@@ -16,8 +16,7 @@ def _text_width(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont)
     """
     if not text:
         return 0
-    # textbbox returns (left, top, right, bottom)
-    bbox = draw.textbbox((0, 0), text, font=font)
+    bbox = draw.textbbox((0, 0), text, font=font)  # (left, top, right, bottom)
     return bbox[2] - bbox[0]
 
 
@@ -68,10 +67,10 @@ def make_meme_image(image: Image.Image, caption: str) -> Image.Image:
     # Try classic Impact font if available
     try:
         font = ImageFont.truetype("Impact.ttf", base_font_size)
-    except:
+    except Exception:
         try:
             font = ImageFont.truetype("arial.ttf", base_font_size)
-        except:
+        except Exception:
             font = ImageFont.load_default()
 
     # Wrap text to fit the width
@@ -82,7 +81,7 @@ def make_meme_image(image: Image.Image, caption: str) -> Image.Image:
     line_height = base_font_size + 6
     total_text_height = line_height * len(lines)
 
-    # Put at TOP with spacing
+    # Top caption (classic meme)
     y = max(int(h * 0.04), 10)
 
     # DRAW EACH LINE with thick black stroke + white fill
@@ -91,16 +90,14 @@ def make_meme_image(image: Image.Image, caption: str) -> Image.Image:
         text_width = bbox[2] - bbox[0]
         x = (w - text_width) // 2
 
-        # Black outline stroke for meme look
         draw.text(
             (x, y),
             line,
             font=font,
             fill="white",
             stroke_width=6,
-            stroke_fill="black"
+            stroke_fill="black",
         )
-
         y += line_height
 
     return img
@@ -112,17 +109,9 @@ def make_meme_image(image: Image.Image, caption: str) -> Image.Image:
 def make_predict_fn(adapter_dir: str, model_name: str):
     """
     Returns a function that Gradio will call.
-    It takes a PIL image + extra tone text and calls our `generate` helper
-    from infer.py, which expects:
-
-        generate(
-            image: Union[str, Image.Image],
-            adapter_dir: Optional[str],
-            model_name: str,
-            num_return_sequences: int,
-            max_new_tokens: int,
-            extra_tone: str,
-        )
+    It takes:
+        image (PIL), extra_tone (str), num_captions (int), max_new_tokens (int)
+    and calls infer.generate().
     """
 
     def predict(image: Image.Image, extra_tone: str,
@@ -158,15 +147,19 @@ def build_interface(predict_fn):
         gr.Markdown(
             "# 🧠🔥 LoRA Meme Generator\n"
             "Upload an image, optionally describe the **tone/vibes**, and get sarcastic captions.\n\n"
-            "The first caption is also overlaid on the image to create a meme."
+            "The first caption is also overlaid on the image to create a meme.\n\n"
+            "**Tip:** After seeing a meme, you can give feedback "
+            "like *\"more dark, more personal, add broke student vibes\"* "
+            "and refine it."
         )
 
         with gr.Row():
+            # LEFT: inputs
             with gr.Column():
                 img_in = gr.Image(type="pil", label="Input image")
                 tone_in = gr.Textbox(
-                    label="Extra tone / vibes (optional)",
-                    placeholder="e.g. tired student, broke but bougie, Monday morning energy…",
+                    label="Initial tone / vibes (optional)",
+                    placeholder="e.g. tired student, Monday morning energy, toxic gym bro vibes…",
                 )
                 num_caps = gr.Slider(
                     minimum=1, maximum=5, step=1, value=3,
@@ -176,8 +169,9 @@ def build_interface(predict_fn):
                     minimum=8, maximum=64, step=4, value=32,
                     label="Max new tokens"
                 )
-                btn = gr.Button("Generate memes 💬")
+                btn_generate = gr.Button("Generate memes 💬")
 
+            # RIGHT: outputs + feedback
             with gr.Column():
                 out_text = gr.Textbox(
                     label="Generated captions",
@@ -187,9 +181,15 @@ def build_interface(predict_fn):
                     label="Meme preview (caption overlaid on image)",
                     type="pil"
                 )
+                feedback_in = gr.Textbox(
+                    label="Feedback / refinement (optional)",
+                    placeholder="e.g. more dark, more sarcastic, mention being broke, make it more personal…",
+                )
+                btn_refine = gr.Button("Refine with feedback 🔁")
 
-        def _wrapped_predict(image, extra_tone, num_captions, max_new_tokens):
-            captions, meme_img = predict_fn(image, extra_tone, num_captions, max_new_tokens)
+        # --- Helpers for calling predict_fn and formatting output ---
+        def _run_predict(image, extra_tone, num_captions, max_new_tokens):
+            captions, meme_img = predict_fn(image, extra_tone, int(num_captions), int(max_new_tokens))
 
             if isinstance(captions, list):
                 text_block = "\n\n".join(f"[{i+1}] {c}" for i, c in enumerate(captions))
@@ -198,9 +198,29 @@ def build_interface(predict_fn):
 
             return text_block, meme_img
 
-        btn.click(
-            fn=_wrapped_predict,
+        # Generate button: uses initial tone
+        btn_generate.click(
+            fn=_run_predict,
             inputs=[img_in, tone_in, num_caps, max_tokens],
+            outputs=[out_text, out_img],
+        )
+
+        # Refine button: uses feedback as a new/stronger tone
+        def _run_refine(image, base_tone, feedback, num_captions, max_new_tokens):
+            # merge base tone + feedback so the model sees both
+            combined_tone = ""
+            if base_tone and feedback:
+                combined_tone = f"{base_tone}; refine: {feedback}"
+            elif feedback:
+                combined_tone = feedback
+            else:
+                combined_tone = base_tone
+
+            return _run_predict(image, combined_tone, num_captions, max_new_tokens)
+
+        btn_refine.click(
+            fn=_run_refine,
+            inputs=[img_in, tone_in, feedback_in, num_caps, max_tokens],
             outputs=[out_text, out_img],
         )
 
