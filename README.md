@@ -62,7 +62,7 @@ Upload an image, get several captions, and optionally overlay text on the image,
 
 ## Notes
 - Training uses **Accelerate** + **PEFT (LoRA)** and can do 8‑bit/4‑bit loading via **bitsandbytes** (optional).
-- Model: `Salesforce/instructblip-flan-t5-large` (image encoder + T5 text decoder).
+- Model: `Salesforce/instructblip-flan-t5-xl` (image encoder + T5 text decoder).
 - Prompts are styled for meme sarcasm; adjust in `data.py` / `infer.py` to fit your flavor.
 - If you want to start from your older BLIP/GPT‑2 pipeline, adapt the CSV export and reuse any cleaning/normalization utilities.
 
